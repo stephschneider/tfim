@@ -1,0 +1,12 @@
+Package: TFIM
+Type: Package
+Title: Determines Wildfire Influence in Air Quality Data
+Version: 0.1.0
+Author: person("Stephanie R.", "Schneider", , "steph.schneider@mail.utoronto.ca", c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-6518-060X"))
+Maintainer: The package maintainer <steph.schneider@mail.utoronto.ca>
+Description: This package downloads Canadian air quality data from the NAPS repository and transforms it into 6-hour averaged data points. Each average point starts at either 00h, 06h, 12h, or 18h UTC. For each 6-hour time average, the model runs 6 HYSPLIT back trajectories using NARR meteorology for the directed time. The number of fires within 0.5 degrees of the back trajectories are counted, and the FRP of the fires are averaged.
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+Imports: splitr(>= 0.4.0.9000),  dplyr(>= 1.0.7), withr(>= 2.2.0), tidyverse(>= 1.3.1), openair(>= 2.8-3)
