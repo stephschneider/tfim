@@ -3,11 +3,18 @@
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 %%  ~~function to do ... ~~
-Calculate the number of interceptions for a specific AQ station and year
+Calculate the number of interceptions for a specific air quality station and year
 }
 \description{
 %%  ~~ A concise (1-5 lines) description of what the function does. ~~
 TFIM_calc() downloads air quality data from the NAPS repository and transforms it into 6-hour averaged data points. Each average point starts at either 00h, 06h, 12h, or 18h UTC. For each 6-hour time average, the model runs 6 HYSPLIT back trajectories using NARR meteorology for the directed time. The number of fires within 0.5 degrees of the back trajectories are counted, and the FRP of the fires are averaged.
+
+The meteorology used here is NARR which is available from 2001-2019. For analysis after 2019, it is recommended to change the meteorology to NAM12. NAM12 has a higher resolution than NARR, however it is only available from May 2007 - present.
+
+The NAM12 readme is available here: https://www.ready.noaa.gov/data/archives/nam12/README.TXT
+The NARR readme is available here: https://www.ready.noaa.gov/data/archives/narr/README.TXT
+
+As usual, always think about the purpose of your analysis when choosing the meteorology.
 }
 \usage{
 TFIM_calc(NAPS_ID,
