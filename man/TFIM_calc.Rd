@@ -1,25 +1,20 @@
-\name{TFIM_calc}
-\alias{TFIM_calc}
+\name{TFIM}
+\alias{TFIM}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 %%  ~~function to do ... ~~
-Calculate the number of interceptions for a specific air quality station and year
+Runs the Trajectory-Fire Interception Method
 }
 \description{
 %%  ~~ A concise (1-5 lines) description of what the function does. ~~
-TFIM_calc() downloads air quality data from the NAPS repository and transforms it into 6-hour averaged data points. Each average point starts at either 00h, 06h, 12h, or 18h UTC. For each 6-hour time average, the model runs 6 HYSPLIT back trajectories using NARR meteorology for the directed time. The number of fires within 0.5 degrees of the back trajectories are counted, and the FRP of the fires are averaged.
+TFIM_calc() downloads air quality data from the NAPS repository and transforms it into 6-hour averaged data points. Each average point starts at either 00h, 06h, 12h, or 18h UTC. For each 6-hour time average, the model runs 6 HYSPLIT back trajectories for the directed time. The number of fires within 0.5 degrees of the back trajectories are counted, and the FRP of the fires are averaged.
 
-The meteorology used here is NARR which is available from 2001-2019. For analysis after 2019, it is recommended to change the meteorology to NAM12. NAM12 has a higher resolution than NARR, however it is only available from May 2007 - present.
-
-The NAM12 readme is available here: https://www.ready.noaa.gov/data/archives/nam12/README.TXT
-The NARR readme is available here: https://www.ready.noaa.gov/data/archives/narr/README.TXT
-
-As usual, always think about the purpose of your analysis when choosing the meteorology.
 }
 \usage{
 TFIM_calc(NAPS_ID,
           duration,
-          Year)
+          year,
+          met)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -31,13 +26,23 @@ TFIM_calc(NAPS_ID,
   The length in hours of the HYSPLIT back trajectory. Represented as an integer. The maximum time is 72 hours.
 %%     ~~Describe \code{x} here~~
 }
-  \item{Year}{
+  \item{year}{
   The year you are interested in downloading and processing the data for. The earliest year possible is 2001.
+%%     ~~Describe \code{x} here~~
+}
+\item{met}{
+  The meteorology used for the HYSPLIT back-trajectory. The default value is narr, which works for 2001-2019. Other options include nam12. Must be a character.
 %%     ~~Describe \code{x} here~~
 }
 }
 \details{
 %%  ~~ If necessary, more details than the description above ~~
+The default meteorology used here is NARR which is available from 2001-2019. For analysis after 2019, it is recommended to change the meteorology to NAM12. NAM12 has a higher resolution than NARR, however it is only available from May 2007 - present.
+
+The NAM12 readme is available here: https://www.ready.noaa.gov/data/archives/nam12/README.TXT
+The NARR readme is available here: https://www.ready.noaa.gov/data/archives/narr/README.TXT
+
+As usual, always think about the purpose of your analysis when choosing the meteorology.
 }
 \value{
 %%  ~Describe the value returned
@@ -55,6 +60,7 @@ DOI: https://pubs.acs.org/doi/10.1021/acs.est.1c04042
 }
 \author{
 %%  ~~who you are~~
+Schneider, S.R.
 }
 \note{
 %%  ~~further notes~~
@@ -67,9 +73,14 @@ DOI: https://pubs.acs.org/doi/10.1021/acs.est.1c04042
 }
 \examples{
 Downloading and processing the data from the air quality station in
-Tomahawk, Alberta in 2009 - 2019.
+Tomahawk, Alberta in 2009.
 
   TFIM_calc(91301, 72, 2009)
+
+Downloading and processing the data from the air quality station in
+Tomahawk, Alberta in 20019.
+
+  TFIM_calc(91301, 72, 2019, met = "nam12")
 
 }
 % Add one or more standard keywords, see file 'KEYWORDS' in the
