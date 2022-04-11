@@ -359,7 +359,7 @@ NAPS_info <- function(){
 
   NAPS_Station <- read.csv("StationsNAPS.csv", skip = 3) %>%
     .[-1,] %>%
-    NAPS_Station[785:826,c(1,4)]
+    .[785:826,c(1,4)]
 
   return(NAPS_Station)
 }
