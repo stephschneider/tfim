@@ -1,5 +1,5 @@
-\name{NAPS_Station}
-\alias{NAPS_Station}
+\name{NAPS}
+\alias{NAPS}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 %%  ~~function to do ... ~~
@@ -9,7 +9,7 @@ HAHA
 %%  ~~ A concise (1-5 lines) description of what the function does. ~~
 }
 \usage{
-NAPS_Station(x)
+NAPS(x)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
