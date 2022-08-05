@@ -3,7 +3,7 @@
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 %%  ~~function to do ... ~~
-HAHA
+Shows where all the different stations are, and what they are measuring. 
 }
 \description{
 %%  ~~ A concise (1-5 lines) description of what the function does. ~~
