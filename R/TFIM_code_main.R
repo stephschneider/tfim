@@ -1,13 +1,13 @@
-TFIM <- function(NAPS_ID, duration, year, met = NULL){
+TFIM_NAPS <- function(NAPS_ID, duration, year, met = NULL){
 
-  if (year <= 2000 | year >= 2020) {
-    return("FIRMS data is only available starting in 2001")
-  }
-
-  if(is.null(met)) {
+  #Defining default meteorology, which is based on year
+  if(is.null(met) & format(as.POSIXct(strptime(end_date,"%Y/%m/%d",tz="")) ,format = "%Y") <= 2019) {
     met <- "narr"
+  } else if (is.null(met) & format(as.POSIXct(strptime(end_date,"%Y/%m/%d",tz="")) ,format = "%Y") > 2019) {
+    met <- "nam12"
   }
 
+  #Reminder to run import_FIRMS() first
   if (exists('FIRMS') == FALSE) {
   return("Import FIRMS first!")
   }
@@ -29,9 +29,9 @@ TFIM <- function(NAPS_ID, duration, year, met = NULL){
                            pollutants[i],
                            ".csv",
                            sep = ""))) {
-      url <- paste("https://data-donnees.ec.gc.ca/data/air/monitor/national-air-pollution-surveillance-naps-program/Data-Donnees/",
+      url <- paste("https://data-donnees.az.ec.gc.ca/api/file?path=/air%2Fmonitor%2Fnational-air-pollution-surveillance-naps-program%2FData-Donnees%2F",
                    year,
-                   "/ContinuousData-DonneesContinu/HourlyData-DonneesHoraires/",
+                   "%2FContinuousData-DonneesContinu%2FHourlyData-DonneesHoraires%2F",
                    pollutants[i],
                    "_",
                    year, ".csv", sep = "")
@@ -129,7 +129,8 @@ TFIM <- function(NAPS_ID, duration, year, met = NULL){
            Hour = as.numeric(Hour),
            month = format(as.POSIXct(strptime(date,"%Y-%m-%d %H",tz="")) ,format = "%m"),
            month = as.numeric(month),
-           DateTime = NULL)
+           DateTime = NULL)%>%
+    selectByDate(month = 5:9)
 
   times <- c(0,6, 12, 18)
   to_delete <- which(Station_Data$Hour %in% times & Station_Data$month %in% 5:9)
@@ -146,20 +147,27 @@ TFIM <- function(NAPS_ID, duration, year, met = NULL){
            month = NULL)
 
   Station_Data <- Station_Data %>%
-    timeAverage(avg.time = "6 hour", data.thresh = 75) %>%
-    selectByDate(month = 5:9) %>%
+    timeAverage(avg.time = "6 hour") %>%
     mutate(Hour = format(as.POSIXct(strptime(date,"%Y-%m-%d %H",tz="")) ,format = "%H"),
            Hour = as.numeric(Hour),
            day = format(as.POSIXct(strptime(date,"%Y-%m-%d %H",tz="")) ,format = "%Y-%m-%d"),
            day = as.Date(day,"%Y-%m-%d", tz= "UTC"),
            Number_of_Fires = as.numeric(""),
            FRP = as.numeric(""),
-           Fire_Influence = as.character(""))
+           Fire_Influence = as.character(""),
+           intercept_time = as.numeric(""))
 
   AQ_data <- Station_Data
 
   lat = as.numeric(NAPS_Station[which(NAPS_Station$NAPS_ID == NAPS_ID),"Latitude"])
   lon = as.numeric(NAPS_Station[which(NAPS_Station$NAPS_ID == NAPS_ID),"Longitude"])
+
+  mainDir <- getwd()
+  metDir <- "HYSPLIT"
+  airDir <- "MonitoringData"
+
+  dir.create(file.path(mainDir, metDir), showWarnings = FALSE)
+  dir.create(file.path(mainDir, airDir), showWarnings = FALSE)
 
   print(year)
 
@@ -172,7 +180,6 @@ TFIM <- function(NAPS_ID, duration, year, met = NULL){
     for (start_time in AQ_data[row, "Hour"]){
       start_time = start_time
     }
-
 
     #HYSPLIT section
     with_dir(paste(getwd(), "/HYSPLIT", sep = ""), trajectory_model <-
@@ -236,15 +243,17 @@ TFIM <- function(NAPS_ID, duration, year, met = NULL){
         if (fire == nrow(FIRMS_date)){
           AQ_data[row, "Number_of_Fires"] <- length(which(FIRMS_date$Fire_Influence == 'Yes'))
           AQ_data[row, "FRP"] <- mean(FIRMS_date$frp[FIRMS_date$Fire_Influence=="Yes"])
+          AQ_data[row, "intercept_time"] <- mean(FIRMS_date$interception[FIRMS_date$Fire_Influence=="Yes"])
         }
         fire = fire+1
       }
     } else {
       AQ_data[row, "Number_of_Fires"] <- 0
       AQ_data[row, "FRP"] <- 0
+      AQ_data[row, "intercept_time"] <- NA
     }
     AQ_data[row, "Fire_Influence"] <- ifelse(AQ_data[row, "Number_of_Fires"] >= 20, "Yes", "No")
-    if(row %% 10 == 0) {print(row)}
+    if (row %% 10 == 0) {print(round(row/NROW(AQ_data)*100, 2), "%", sep = " ")}
     row = row + 1
   }
 
@@ -254,14 +263,157 @@ TFIM <- function(NAPS_ID, duration, year, met = NULL){
   return(AQ_data)
 }
 
-TFIM_plot <- function(NAPS_ID, date, hour, duration, met = NULL){
+TFIM <- function(lat, lon, duration, start_date, end_date, met = NULL, satellite = NULL, location = NULL){
 
-  if (exists('FIRMS') == FALSE) {
-    Import_FIRMS()
+  #Defining default meteorology, which is based on year
+  if(is.null(met) & format(as.POSIXct(strptime(end_date,"%Y/%m/%d",tz="")) ,format = "%Y") <= 2019) {
+    met <- "narr"
+  } else if (is.null(met) & format(as.POSIXct(strptime(end_date,"%Y/%m/%d",tz="")) ,format = "%Y") > 2019) {
+    met <- "nam12"
   }
 
-  if(is.null(met)) {
+  #Creating output to promt FIRMS update
+  if (exists('FIRMS') == FALSE) {
+    return("Import FIRMS first!")
+  }
+
+  #creating dataframe which can be accepted by the HYSPLIT model; includes pre-set 6-hour periods (in UTC)
+  day <- seq(as.Date(start_date), as.Date(end_date), by = "days")
+  AQ_data <- data.frame(day, "0")
+  AQ_data <- AQ_data %>%
+    mutate("00" = 0,
+           "06" =0,
+           "12" = 0,
+           "18" = 0,
+           "X.00." = NULL) %>%
+    pivot_longer(cols = c("00", "06", "18", "12"), names_to = "Hour", values_to = "bop") %>%
+    mutate(date = paste(as.character(day), Hour, sep = " "),
+           date = as.POSIXct(date, format = "%Y-%m-%d %H")) %>%
+    select(-`X.0.`) %>%
+    timeAverage(avg.time = "6 hour") %>%
+    mutate(Hour = format(as.POSIXct(strptime(date,"%Y-%m-%d %H",tz="")) ,format = "%H"),
+           Hour = as.numeric(Hour),
+           day = format(as.POSIXct(strptime(date,"%Y-%m-%d %H",tz="")) ,format = "%Y-%m-%d"),
+           day = as.Date(day,"%Y-%m-%d", tz= "UTC"),
+           Number_of_Fires = as.numeric(""),
+           FRP = as.numeric(""),
+           Fire_Influence = as.character(""),
+           intercept_time = as.numeric(""),
+           Hour = case_when(Hour == 24~0,
+                            Hour == 23~0,
+                            Hour == 5~6,
+                            Hour == 17~18,
+                            Hour == 11~12,
+                            Hour == 23~0))
+
+  #defining variables for HYSPLIT
+  for (row in 1:NROW(AQ_data)){
+    for (start_day in AQ_data[row, "day"]){
+      start_day = start_day
+      start_day2 = start_day - 1
+      start_day3 = start_day - 2
+    }
+    for (start_time in AQ_data[row, "Hour"]){
+      start_time = start_time
+    }
+
+
+    #HYSPLIT section
+    with_dir(paste(getwd(), "/HYSPLIT", sep = ""), trajectory_model <-
+               create_trajectory_model() %>%
+               add_trajectory_params(
+                 lat = lat,
+                 lon = lon,
+                 height = 0,
+                 duration = duration,
+                 days = start_day,
+                 daily_hours = c(start_time, start_time-1, start_time-2, start_time-3, start_time-4, start_time-5),
+                 direction = "backward",
+                 met_type = met,
+               ) %>%
+               run_model()
+    )
+    trajectory_tbl <- trajectory_model %>% get_output_tbl()
+
+    trajectory_tbl <- trajectory_tbl
+
+    for (start_daytime in AQ_data[row, "day"]){
+      start_daytime = as.POSIXct(start_daytime)
+      start_daytime3 = as.POSIXct(start_daytime - 172800)
+    }
+
+    #Then I need to get the FIRMS data for the correct date bracket
+    #Fixed on January 11th so it now includes time constraints to better match FireSmoke data
+    FIRMS_date <- FIRMS %>%
+      filter(datetime > start_daytime3) %>%
+      filter(datetime < start_daytime) %>%
+      mutate(Fire_Influence = as.character(""))
+
+
+    latmin = min(trajectory_tbl$lat, na.rm = TRUE) - 0.5
+    latmax = max(trajectory_tbl$lat, na.rm = TRUE) + 0.5
+    lonmin = min(trajectory_tbl$lon, na.rm = TRUE) - 0.5
+    lonmax = max(trajectory_tbl$lon, na.rm = TRUE) + 0.5
+
+    FIRMS_date <- subset(FIRMS_date, FIRMS_date$latitude < latmax &
+                           FIRMS_date$latitude > latmin &
+                           FIRMS_date$longitude < lonmax &
+                           FIRMS_date$longitude > lonmin)
+
+
+    #FIRMS/HYSPLIT interception section
+    if (nrow(FIRMS_date)>0){
+
+      for (fire in 1:NROW(FIRMS_date)) {
+        latmin = as.numeric(FIRMS_date[fire, "latitude"] - 0.5)
+        latmax = as.numeric(FIRMS_date[fire, "latitude"] + 0.5)
+        lonmin = as.numeric(FIRMS_date[fire, "longitude"] - 0.5)
+        lonmax = as.numeric(FIRMS_date[fire, "longitude"] + 0.5)
+
+        traj_test <- trajectory_tbl %>%
+          filter(between(trajectory_tbl$lat,latmin, latmax),
+                 between(trajectory_tbl$lon ,lonmin,lonmax))
+
+        if(nrow(traj_test)>0) {
+          FIRMS_date[fire, "Fire_Influence"] = "Yes"
+          FIRMS_date[fire, "interception"] = mean(traj_test$hour_along)
+        } else {
+          FIRMS_date[fire, "Fire_Influence"] <- "No"
+        }
+
+        if (fire == nrow(FIRMS_date)){
+          AQ_data[row, "Number_of_Fires"] <- length(which(FIRMS_date$Fire_Influence == 'Yes'))
+          AQ_data[row, "FRP"] <- mean(FIRMS_date$frp[FIRMS_date$Fire_Influence=="Yes"])
+          AQ_data[row, "intercept_time"] <- mean(FIRMS_date$interception[FIRMS_date$Fire_Influence=="Yes"])
+        }
+        fire = fire+1
+      }
+    } else {
+      AQ_data[row, "Number_of_Fires"] <- 0
+      AQ_data[row, "FRP"] <- NA
+      AQ_data[row, "intercept_time"] <- NA
+    }
+    AQ_data[row, "Fire_Influence"] <- ifelse(AQ_data[row, "Number_of_Fires"] >= 20, "Yes", "No")
+    if (row %% 10 == 0) {print(paste(round(row/nrow(AQ_data)*100, 2), "%", sep = " "))}
+    row = row + 1
+  }
+
+  AQ_data$FRP <- round(AQ_data$FRP, digits = 1)
+
+  name <- paste(AQ_data[1, "day"], ifelse(is.null(location), "", location), duration, ifelse(is.null(satellite), "", satellite),  sep = "_")
+
+  write.csv(AQ_data, paste(name, ".csv", sep = ""))
+  return(AQ_data)
+}
+
+
+TFIM_plot <- function(NAPS_ID, date, hour, duration, met = NULL){
+
+  #Defining default meteorology, which is based on year
+  if(is.null(met) & format(as.POSIXct(strptime(end_date,"%Y/%m/%d",tz="")) ,format = "%Y") <= 2019) {
     met <- "narr"
+  } else if (is.null(met) & format(as.POSIXct(strptime(end_date,"%Y/%m/%d",tz="")) ,format = "%Y") > 2019) {
+    met <- "nam12"
   }
 
   NAPS_Station <- NAPS()
@@ -272,7 +424,7 @@ TFIM_plot <- function(NAPS_ID, date, hour, duration, met = NULL){
   lon = as.numeric(NAPS_Station[which(NAPS_Station$NAPS_ID == NAPS_ID),"Longitude"])
 
     #HYSPLIT section
-   with_dir("D:/TFIM Method Code/Ozone Project/HYSPLIT", trajectory_model <-
+  with_dir(paste(getwd(), "/HYSPLIT", sep = ""), trajectory_model <-
                create_trajectory_model() %>%
                add_trajectory_params(
                  lat = lat,
@@ -337,21 +489,35 @@ TFIM_plot <- function(NAPS_ID, date, hour, duration, met = NULL){
     annotate("point", x = lon, y = lat, colour = "purple", size = 5)
 }
 
-Import_FIRMS <- function(NameofFile = NULL) {
+Import_FIRMS <- function(instrument, NameofFile = NULL) {
 
   if(is.null(NameofFile)){
     NameofFile <- "FIRMS_data"
   }
 
+  if(instrument != "MODIS" & instrument != "VIIRS"){
+    print("Please indicate either MODIS or VIIRS")
+  }
+
   NameofFile <- as.character(NameofFile)
 
-    if (exists('FIRMS') == FALSE) {
+  if (exists('FIRMS') == FALSE) {
     FIRMS <- readr::read_csv(paste(NameofFile, ".csv", sep="")) %>%
-      filter(confidence >= 30) %>%
       mutate(acq_date = as.Date(acq_date),
              datetime = format(strptime(acq_time, format="%H%M"), format = "%H:%M"),
              datetime = as.POSIXct(paste(acq_date, datetime), format = "%Y-%m-%d %H:%M"))
-    }
+  }
+
+  if (instrument == "MODIS"){
+    FIRMS <- FIRMS %>%
+      filter(confidence >= 30)
+  }
+
+  if (instrument == "VIIRS"){
+    FIRMS <- FIRMS %>%
+      filter(confidence != "L")
+  }
+
   FIRMS <<- FIRMS
 }
 
@@ -372,74 +538,4 @@ NAPS <- function(){
   return(NAPS_Station)
 }
 
-NAPS_plot <- function(province,
-                              site_type = "default",
-                              urbanization = "default",
-                              status = "default",
-                              pollutants = "default") {
 
-  NAPS_Station <- NAPS() %>%
-    filter(NAPS_Station$P.T == province)
-
-  if (site_type != "default") {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$Site_Type == site_type)
-    }
-  if (status != "default") {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$Status == as.numeric(status))
-    }
-  if (urbanization != "default") {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$Urbanization == urbanization)
-  }
-  if ("SO2" %in% pollutants) {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$SO2 == "X")
-  }
-  if ("NO2" %in% pollutants) {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$NO2 == "X")
-  }
-  if ("NO" %in% pollutants) {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$NO == "X")
-  }
-  if ("CO" %in% pollutants) {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$CO == "X")
-  }
-  if ("O3" %in% pollutants) {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$O3 == "X")
-  }
-  if ("NOX" %in% pollutants) {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$NOX == "X")
-  }
-  if ("PM25" %in% pollutants) {
-    NAPS_Station <- NAPS_Station %>%
-      filter(NAPS_Station$PM_25_Continuous == "X")
-  }
-
-
-  NAPS_box <- make_bbox(lon = as.numeric(NAPS_Station$Longitude), lat = as.numeric(NAPS_Station$Latitude), f= 0.01)
-  NAPS_map <- get_stamenmap(bbox = NAPS_box, zoom = 6, maptype = "terrain", crop = FALSE)
-  transectMap <- ggmap(NAPS_map)
-  transectMap <- transectMap +
-    geom_point(data = NAPS_Station,
-               aes(x = as.numeric(Longitude),
-                   y = as.numeric(Latitude)))+
-    geom_label_repel(data = NAPS_Station,
-              aes(x = as.numeric(Longitude),
-                             y = as.numeric(Latitude),
-                             label = Station_Name),
-              size = 3,
-              force_pull = 0.2,
-              force = 10,
-              max.overlaps = Inf)
-
-
-  return(list(transectMap, NAPS_Station[, c("NAPS_ID", "Station_Name", "Start_year", "End_year")]))
-
-}
