@@ -13,7 +13,7 @@ For each 6-hour time average, the model runs 6 HYSPLIT back trajectories for the
 
 }
 \usage{
-TFIM_calc(NAPS_ID,
+TFIM_NAPS(NAPS_ID,
           duration,
           year,
           met)
