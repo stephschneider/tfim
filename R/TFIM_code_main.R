@@ -317,6 +317,10 @@ TFIM <- function(lat, lon, duration, start_date, end_date, met = NULL, satellite
       start_time = start_time
     }
 
+    mainDir <- getwd()
+    metDir <- "HYSPLIT"
+
+    dir.create(file.path(mainDir, metDir), showWarnings = FALSE)
 
     #HYSPLIT section
     with_dir(paste(getwd(), "/HYSPLIT", sep = ""), trajectory_model <-
