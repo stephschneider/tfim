@@ -3,17 +3,26 @@
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
 %%  ~~function to do ... ~~
-Makes it a bit easier to run the code
+Loads satellite data
 }
 \description{
 %%  ~~ A concise (1-5 lines) description of what the function does. ~~
+Imports the correct FIRMS (either MODIS or VIIRS satellite) data into RStudio.
+MODIS: filters for confidence over 30%
+VIIRS: filters for nominal or high confidence (removes low confidence data points)
+
 }
 \usage{
-Import_FIRMS(x)
+Import_FIRMS(satellite, NameofFile)
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
-  \item{x}{
+  \item{NameofFile}{
+  Defaults to "FIRMS_data", but can receive other names
+%%     ~~Describe \code{x} here~~
+}
+  \item{satellite}{
+  specify which satellite program (MODIS or VIIRS) contained within the file. Treats the data according to each dataset.
 %%     ~~Describe \code{x} here~~
 }
 }
