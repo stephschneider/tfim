@@ -286,14 +286,14 @@ TFIM <- function(lat, lon, duration, start_date, end_date, met = NULL, satellite
            "12" = 0,
            "18" = 0,
            "X.00." = NULL) %>%
-    pivot_longer(cols = c("00", "06", "18", "12"), names_to = "Hour", values_to = "bop") %>%
+    pivot_longer(cols = c("00", "06", "12", "18"), names_to = "Hour", values_to = "bop") %>%
     mutate(date = paste(as.character(day), Hour, sep = " "),
-           date = as.POSIXct(date, format = "%Y-%m-%d %H")) %>%
+           date = as.POSIXct(date, format = "%Y-%m-%d %H:%M:%S")) %>%
     select(-`X.0.`) %>%
     timeAverage(avg.time = "6 hour") %>%
-    mutate(Hour = format(as.POSIXct(strptime(date,"%Y-%m-%d %H",tz="")) ,format = "%H"),
+    mutate(Hour = format(as.POSIXct(strptime(date,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%H"),
            Hour = as.numeric(Hour),
-           day = format(as.POSIXct(strptime(date,"%Y-%m-%d %H",tz="")) ,format = "%Y-%m-%d"),
+           day = format(as.POSIXct(strptime(date,"%Y-%m-%d %H:%M:%S",tz="")) ,format = "%Y-%m-%d"),
            day = as.Date(day,"%Y-%m-%d", tz= "UTC"),
            Number_of_Fires = as.numeric(""),
            FRP = as.numeric(""),
@@ -304,7 +304,8 @@ TFIM <- function(lat, lon, duration, start_date, end_date, met = NULL, satellite
                             Hour == 5~6,
                             Hour == 17~18,
                             Hour == 11~12,
-                            Hour == 23~0))
+                            Hour == 23~0,
+                            Hour %in% c(0, 6, 12, 18)~Hour))
 
   #defining variables for HYSPLIT
   for (row in 1:NROW(AQ_data)){
